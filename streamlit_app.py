@@ -1,15 +1,13 @@
 # streamlit_app.py
 import streamlit as st
 import pandas as pd
-import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 import shap
 
-st.title("Test: Streamlit is working!")
-st.write("If you see this, the app is loading correctly.")
-
+st.title("🎓 Student Exam Score Prediction")
+st.write("Predict a student's math score based on input features.")
 
 # --- Load Dataset ---
 @st.cache_data
@@ -19,25 +17,27 @@ def load_data():
 
 df = load_data()
 
-st.title("🎓 Student Exam Score Prediction")
-st.write("Predict a student's exam score based on input features.")
+# Show the first few rows
+if st.checkbox("Show dataset preview"):
+    st.write(df.head())
 
 # --- Input fields ---
-study_hours = st.number_input("Study Hours per day", min_value=0.0, max_value=24.0, value=2.0, step=0.5)
-attendance = st.slider("Attendance %", 0, 100, 80)
-lunch = st.selectbox("Lunch Type", df['lunch'].unique())
+gender = st.selectbox("Gender", df['gender'].unique())
+race = st.selectbox("Race/Ethnicity", df['race/ethnicity'].unique())
 parent_edu = st.selectbox("Parental Education", df['parental level of education'].unique())
+lunch = st.selectbox("Lunch Type", df['lunch'].unique())
+test_prep = st.selectbox("Test Preparation Course", df['test preparation course'].unique())
 
-# --- Preprocessing ---
-X = df[['study time', 'attendance', 'lunch', 'parental level of education']]
-y = df['math score']  # predicting math score as an example
+# --- Prepare features ---
+X = df[['gender', 'race/ethnicity', 'parental level of education', 'lunch', 'test preparation course']]
+y = df['math score']
 
-# Encode categorical columns
-le_lunch = LabelEncoder()
-X['lunch'] = le_lunch.fit_transform(X['lunch'])
-
-le_parent = LabelEncoder()
-X['parental level of education'] = le_parent.fit_transform(X['parental level of education'])
+# Encode categorical features
+le_dict = {}
+for col in X.columns:
+    le = LabelEncoder()
+    X[col] = le.fit_transform(X[col])
+    le_dict[col] = le
 
 # --- Train model ---
 model = RandomForestRegressor(n_estimators=100, random_state=42)
@@ -45,14 +45,15 @@ model.fit(X, y)
 
 # --- Prepare user input for prediction ---
 user_input = pd.DataFrame({
-    'study time': [study_hours],
-    'attendance': [attendance],
-    'lunch': [le_lunch.transform([lunch])[0]],
-    'parental level of education': [le_parent.transform([parent_edu])[0]]
+    'gender': [le_dict['gender'].transform([gender])[0]],
+    'race/ethnicity': [le_dict['race/ethnicity'].transform([race])[0]],
+    'parental level of education': [le_dict['parental level of education'].transform([parent_edu])[0]],
+    'lunch': [le_dict['lunch'].transform([lunch])[0]],
+    'test preparation course': [le_dict['test preparation course'].transform([test_prep])[0]]
 })
 
 # --- Predict ---
-if st.button("Predict Score"):
+if st.button("Predict Math Score"):
     prediction = model.predict(user_input)[0]
     st.success(f"Predicted Math Score: {prediction:.2f}")
 
@@ -71,3 +72,4 @@ if st.button("Predict Score"):
     fig2, ax2 = plt.subplots()
     shap.summary_plot(shap_values, X, show=False)
     st.pyplot(fig2)
+# redeploy-trigger
